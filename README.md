@@ -231,4 +231,10 @@ CodeShell基于Starcoder词表进行了优化，去除了使用频率较低的�
 
 ## License
 
-本仓库开源的模型遵循[Apache 2.0 许可证](https://www.apache.org/licenses/LICENSE-2.0)，对学术研究完全开放，若需要商用，开发者可发送邮件进行申请，得到书面授权后即可使用。联系邮箱：[codeshell.opensource@gmail.com](mailto:codeshell.opensource@gmail.com)
+社区使用CodeShell模型需要遵循《CodeShell模型许可协议》及Apache 2.0许可协议。CodeShell模型允许用于商业用途，但如果您计划将CodeShell模型或其派生产品用于商业用途，需要您确认主体符合以下条件：
+
+1. 关联方的服务或产品的每日平均活跃用户数（DAU）不能超过100万。
+2. 关联方不得是软件服务提供商或云服务提供商。
+3. 关联方不存在将获得授予的商业许可，在未经许可的前提下将其再授权给其他第三方的可能性。
+
+在满足上述条件的前提下，您需要通过向codeshell.opensource@gmail.com发送电子邮件提交申请。经审核通过后，将授予您一个全球的、非排他的、不可转让的、不可再授权的商业版权许可。
