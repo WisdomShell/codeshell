@@ -17,7 +17,7 @@
 
 ## Introduction
 
-CodeShell是[北京大学知识计算实验室](http://se.pku.edu.cn/kcl/)研发的多语言代码大模型基座。CodeShell具有70亿参数，在五千亿Tokens进行了训练，上下文窗口长度为8194。在权威的代码评估Benchmark（HumanEval与MBPP）上，CodeShell取得同等规模最好的性能。与此同时，我们提供了与CodeShell配套的部署方案与IDE插件，请参考代码库[CodeShell](https://github.com/WisdomShell/codeshell)。
+CodeShell是[北京大学知识计算实验室](http://se.pku.edu.cn/kcl/)联合四川天府银行AI团队研发的多语言代码大模型基座。CodeShell具有70亿参数，在五千亿Tokens进行了训练，上下文窗口长度为8194。在权威的代码评估Benchmark（HumanEval与MBPP）上，CodeShell取得同等规模最好的性能。与此同时，我们提供了与CodeShell配套的部署方案与IDE插件，请参考代码库[CodeShell](https://github.com/WisdomShell/codeshell)。
 
 
 本次开源的模型如下：
