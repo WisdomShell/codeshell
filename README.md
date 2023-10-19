@@ -150,11 +150,7 @@ tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4')
 
 - CodeShell in c/c++
 
-由于大部分个人电脑没有GPU，CodeShell提供了C/C++版本的推理支持，开发者可以根据本地环境进行编译，详见[CodeShell C/C++本地化版](https://github.com/WisdomShell/llama_cpp_for_codeshell)。编译完成后，可以通过下列命令启动Web API服务。
-
-```
-./server -m {gguf_path}  -c 2048
-```
+由于大部分个人电脑没有GPU，CodeShell提供了C/C++版本的推理支持，开发者可以根据本地环境进行编译与使用，详见[CodeShell C/C++本地化版](https://github.com/WisdomShell/llama_cpp_for_codeshell)。
 
 ## Demo
 
