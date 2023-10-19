@@ -121,9 +121,6 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 device = torch.device('cuda:0')
-# CodeShell-7B-Chat量化版本，占用显存更小
-# model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4', trust_remote_code=True).to(device)
-# tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4')
 model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat', trust_remote_code=True).to(device)
 tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat')
 
@@ -139,7 +136,6 @@ print(response)
 history.append((query, response))
 ```
 
-
 开发者也可以通过VS Code与JetBrains插件与CodeShell-7B-Chat交互，详情请参[VSCode插件仓库](https://github.com/WisdomShell/codeshell-vscode)与[IntelliJ插件仓库](https://github.com/WisdomShell/codeshell-intellij)。
 
 
@@ -148,21 +144,17 @@ history.append((query, response))
 CodeShell 支持4 bit/8 bit量化，4 bit量化后，占用显存大小约6G，用户可以在显存较小的GPU上使用CodeShell。
 
 ```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-tokenizer = AutoTokenizer.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True)
-model = model.quantize(4).cuda()
-
-inputs = tokenizer('def print_hello_world():', return_tensors='pt').cuda()
-outputs = model.generate(inputs)
-print(tokenizer.decode(outputs[0]))
+model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4', trust_remote_code=True).to(device)
+tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4')
 ```
 
 - CodeShell in c/c++
 
 由于大部分个人电脑没有GPU，CodeShell提供了C/C++版本的推理支持，开发者可以根据本地环境进行编译，详见[CodeShell C/C++本地化版](https://github.com/WisdomShell/llama_cpp_for_codeshell)。编译完成后，可以通过下列命令启动Web API服务。
+
+```
+./server -m {gguf_path}  -c 2048
+```
 
 ## Demo
 
