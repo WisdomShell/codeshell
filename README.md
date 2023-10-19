@@ -79,7 +79,7 @@ pip install -r requirements.txt
 
 开发者可以使用CodeShell快速生成代码，加速开发效率。
 
-```
+```python
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -96,7 +96,7 @@ print(tokenizer.decode(outputs[0]))
 
 CodeShell 支持Fill-in-the-Middle模式，从而更好的支持软件开发过程。
 
-```
+```python
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -115,7 +115,7 @@ print(tokenizer.decode(outputs[0]))
 
 CodeShell同时开源了代码助手模型CodeShell-7B-Chat，开发者可以通过下列代码与模型进行交互。
 
-```
+```python
 import time
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -147,7 +147,7 @@ history.append((query, response))
 
 CodeShell 支持4 bit/8 bit量化，4 bit量化后，占用显存大小约6G，用户可以在显存较小的GPU上使用CodeShell。
 
-```
+```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
 tokenizer = AutoTokenizer.from_pretrained("WisdomShell/
 CodeShell-Chat", trust_remote_code=True)
