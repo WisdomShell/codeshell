@@ -1,17 +1,17 @@
-<div align="center">
-    <h1>CodeShell</h1>
-</div>
 
 <p align="center">
-  🤗 <a href="https://huggingface.co/WisdomShell/CodeShell" target="_blank">Hugging Face</a> • 🌐 <a href="http://se.pku.edu.cn/kcl/" target="_blank">KCL</a> 
+    <img src="https://cdn-uploads.huggingface.co/production/uploads/6489a27bd0b2fd1f3297e5ca/3LQsqRzluBhBN2DipN6Ox.png" width="400"/>
+<p>
+
+<p align="center">
+  🤗 <a href="https://huggingface.co/WisdomShell/CodeShell" target="_blank">Hugging Face</a> • 🌐 <a href="http://se.pku.edu.cn/kcl/" target="_blank">PKU-KCL</a> 
 </p>
 
-
-[![license](https://img.shields.io/github/license/modelscope/modelscope.svg)](https://github.com/ruixie/CodeShell/blob/main/LICENSE)
-
 <div align="center">
+    
+[![license](https://img.shields.io/github/license/modelscope/modelscope.svg)](https://github.com/WisdomShell/codeshell/blob/main/LICENSE)
 <h4 align="center">
-    <p><a href="https://github.com/ruixie/CodeShell/blob/main/README.md"><b>中文</b></a>|<a href="https://github.com/ruixie/CodeShell/blob/main/README_EN.md">English</a></p>
+    <p><a href="https://github.com/WisdomShell/codeshell/blob/main/README.md"><b>中文</b></a>|<a href="https://github.com/WisdomShell/codeshell/blob/main/README_EN.md">English</a></p>
 </h4>
 </div>
 
