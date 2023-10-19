@@ -23,5 +23,3 @@ cd codeshell/evaluation
 ./run_eval.sh local_gen humaneval $model_name_or_path $save_folder
 ./run_eval.sh eval humaneval $model_name_or_path $save_folder
 ```
-
-遵循本指南，您现在可以充分利用bigcode-evaluation-harness来对模型在特定任务上表现的评估。

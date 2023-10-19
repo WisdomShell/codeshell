@@ -34,4 +34,4 @@ cd codeshell/finetune
 
 按照这些步骤操作，您可以将预训练的模型微调，使其更加精确地适应您的特定任务。
 
-请注意，该微调脚本基于qwen、fastchat 和 tatsu-lab/stanford_alpaca 的微调脚本。
+该微调脚本基于qwen、fastchat 和 tatsu-lab/stanford_alpaca 的微调脚本。
