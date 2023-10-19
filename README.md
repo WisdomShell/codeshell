@@ -8,7 +8,7 @@
 </p>
 
 <div align="center">
-    
+
 [![license](https://img.shields.io/github/license/modelscope/modelscope.svg)](https://github.com/WisdomShell/codeshell/blob/main/LICENSE)
 <h4 align="center">
     <p><a href="https://github.com/WisdomShell/codeshell/blob/main/README.md"><b>中文</b></a>|<a href="https://github.com/WisdomShell/codeshell/blob/main/README_EN.md">English</a></p>
@@ -83,16 +83,10 @@ pip install -r requirements.txt
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# use base model
-# tokenizer = AutoTokenizer.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True)
-# model = AutoModelForCausalLM.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True).cuda()
-
 tokenizer = AutoTokenizer.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True)
+CodeShell-7B")
 model = AutoModelForCausalLM.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True).cuda()
+CodeShell-7B", trust_remote_code=True).cuda()
 inputs = tokenizer('def merge_sort():', return_tensors='pt').cuda()
 outputs = model.generate(inputs)
 print(tokenizer.decode(outputs[0]))
@@ -103,11 +97,51 @@ print(tokenizer.decode(outputs[0]))
 CodeShell 支持Fill-in-the-Middle模式，从而更好的支持软件开发过程。
 
 ```
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("WisdomShell/
+CodeShell-7B")
+model = AutoModelForCausalLM.from_pretrained("WisdomShell/
+CodeShell-7B", trust_remote_code=True).cuda()
+
 input_text = "<fim_prefix>def print_hello_world():\n    <fim_suffix>\n    print('Hello world!')<fim_middle>"
 inputs = tokenizer(input_text, return_tensors='pt').cuda()
 outputs = model.generate(inputs)
 print(tokenizer.decode(outputs[0]))
 ```
+
+- 代码问答
+
+CodeShell同时开源了代码助手模型CodeShell-7B-Chat，开发者可以通过下列代码与模型进行交互。
+
+```
+import time
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+device = torch.device('cuda:0')
+# CodeShell-7B-Chat量化版本，占用显存更小
+# model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4', trust_remote_code=True).to(device)
+# tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4')
+model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat', trust_remote_code=True).to(device)
+tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat')
+
+history = []
+query = '你是谁?'
+response = model.chat(query, history, tokenizer)
+print(response)
+history.append((query, response))
+
+query = '用Python写一个HTTP server'
+response = model.chat(query, history, tokenizer)
+print(response)
+history.append((query, response))
+```
+
+
+开发者也可以通过VS Code与JetBrains插件与CodeShell-7B-Chat交互，详情请参[VSCode插件仓库](https://github.com/WisdomShell/codeshell-vscode)与[IntelliJ插件仓库](https://github.com/WisdomShell/codeshell-intellij)。
+
 
 - Model Quantization
 
