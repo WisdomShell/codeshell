@@ -16,7 +16,7 @@
 
 ## Introduction
 
-CodeShell is a multi-language code base model developed jointly by the [Knowledge Computing Lab at Peking University](http://se.pku.edu.cn/kcl/) and the AI team of Sichuan Tianfu Bank. CodeShell has 7 billion parameters, was trained on 500 billion tokens, and has a context window length of 8192. On authoritative code evaluation benchmarks (HumanEval and MBPP), CodeShell achieves the best performance for models of its scale. At the same time, we offer deployment solutions and IDE plugins that complement CodeShell. Please refer to the [CodeShell](https://github.com/WisdomShell/codeshell) repository for details.
+CodeShell is a code large language model (LLM) developed jointly by the [Knowledge Computing Lab at Peking University](http://se.pku.edu.cn/kcl/) and the AI team of Sichuan Tianfu Bank. CodeShell has 7 billion parameters, was trained on 500 billion tokens, and has a context window length of 8192. On authoritative code evaluation benchmarks (HumanEval and MBPP), CodeShell achieves the best performance for models of its scale. At the same time, we offer deployment solutions and IDE plugins that complement CodeShell. Please refer to the [CodeShell](https://github.com/WisdomShell/codeshell) repository for details.
 
 The open-source models are as follows:
 
@@ -204,7 +204,7 @@ Code Shell uses GPT-2 as its basic architecture and employs technologies like Gr
 
 ### Data
 
-CodeShell was trained based on the open-source Stack dataset from Big Code. On top of the original dataset, CodeShell used Minihash for data deduplication, KenLM, and a high-quality data selection model for data filtering and selection, resulting in a high-quality pre-training dataset.
+CodeShell was trained based on its own scraped Github data, the open-source Stack and StarCoder datasets from Big Code, as well as a small amount of high-quality Chinese and English data. On top of the original dataset, CodeShell used Minihash for data deduplication, KenLM, and a high-quality data selection model for data filtering and selection, resulting in a high-quality pre-training dataset.
 
 ### Tokenizer
 
