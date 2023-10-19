@@ -162,7 +162,7 @@ print(tokenizer.decode(outputs[0]))
 
 - CodeShell in c/c++
 
-由于大部分个人电脑没有GPU，CodeShell提供了C/C++版本的推理支持，开发者可以根据本地环境进行编译，详见[CodeShell C/C++本地化版]()。编译完成后，可以通过下列命令启动Web API服务。
+由于大部分个人电脑没有GPU，CodeShell提供了C/C++版本的推理支持，开发者可以根据本地环境进行编译，详见[CodeShell C/C++本地化版](https://github.com/WisdomShell/llama_cpp_for_codeshell)。编译完成后，可以通过下列命令启动Web API服务。
 
 ## Demo
 
@@ -194,7 +194,7 @@ python openai_api.py
 
 ### IDE
 
-CodeShell最后提供了线上IDE，开发者可以通过IDE进行代码补全、代码问答等操作。同时，IDE插件也同时发布，开发者可以自行在本地进行安装使用。插件相关问题欢迎在[VS Code插件仓库]()中讨论。
+CodeShell最后提供了线上IDE，开发者可以通过IDE进行代码补全、代码问答等操作。同时，IDE插件也同时发布，开发者可以自行在本地进行安装使用。插件相关问题欢迎在[VSCode插件仓库](https://github.com/WisdomShell/codeshell-vscode)与[IntelliJ插件仓库](https://github.com/WisdomShell/codeshell-intellij)。中讨论。
 
 
 ## Model Details
