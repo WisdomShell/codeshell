@@ -1,22 +1,22 @@
-# Evaluation
-This guide introduces the evaluation process of codeshell. The evaluation script is base on [bigcode-evaluation-harness](https://github.com/bigcode-project/bigcode-evaluation-harness).
+# 代码评估
+本文档将向您完整地介绍codeshell的代码评估过程，该评估脚本都是基于[bigcode-evaluation-harness](https://github.com/bigcode-project/bigcode-evaluation-harness)。
 
-## Quick Start
+## 开始步骤
 
-Begin by cloning the bigcode-evaluation-harness repository and entering the directory:
+首先，复制bigcode-evaluation-harness仓库并导航至所在的文件夹内：
 
 ```bash
 git clone https://github.com/bigcode-project/bigcode-evaluation-harness.git
 cd bigcode-evaluation-harness
 ```
 
-Next, install PyTorch according to your device specifications, and then install the remaining packages using the command:
+接下来，依照您设备的规格，安装PyTorch，然后运行以下命令安装剩余的依赖：
 
 ```bash
 pip install -e .
 ```
 
-To generate and evaluate tasks with the evaluation script, follow the example below. Ensure you are in the appropriate directory (`codeshell/evaluation`), then execute the two `run_eval.sh` commands:
+要使用评估脚本生成和评估任务，请按下述样例进行。确保您位于正确的目录中（`codeshell/evaluation`），然后依次执行两个 `run_eval.sh` 命令：
 
 ```bash
 cd codeshell/evaluation
@@ -24,4 +24,4 @@ cd codeshell/evaluation
 ./run_eval.sh eval humaneval $model_name_or_path $save_folder
 ```
 
-By following this guide, you can now effectively utilize the bigcode-evaluation-harness to evaluate your model's performance on specific tasks.
+遵循本指南，您现在可以充分利用bigcode-evaluation-harness来对模型在特定任务上表现的评估。

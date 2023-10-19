@@ -1,11 +1,11 @@
-In this guide, we present the official fine-tuning script for users who wish to adapt pretrained models for their domain-specific tasks.
+该文档为希望在特定领域任务中应用CodeShell模型的用户提供了官方微调示例。
 
-To begin, please set up the required environment by executing the following command:
+开始前，您需要通过执行以下命令来配置必要的环境：
 ```bash
 pip install peft deepspeed
 ```
 
-The training data should be organized in JSON format, with each sample being a dictionary containing an ID and a conversation list. The conversation list is an array of message objects, representing the conversation between the user and the assistant. See the example below:
+您需要按照 JSON 格式整理训练数据，其中每个样本是一个包含 ID 和对话列表的字典。该对话列表是消息对象的数组，代表了用户和助手之间的交谈。如下所示为一个样例：
 
 ```json
 [
@@ -13,7 +13,7 @@ The training data should be organized in JSON format, with each sample being a d
     "id": "identity_0",
     "conversations": [
       {
-        "from": "user",
+        "from": "human",
         "value": "你好"
       },
       {
@@ -25,11 +25,13 @@ The training data should be organized in JSON format, with each sample being a d
 ]
 ```
 
-Once the data is prepared, navigate to the fine-tuning directory and execute the `run_finetune.sh` script using the following command:
+当数据准备完毕后，导航至微调的目录并执行 `run_finetune.sh` 脚本，命令如下：
 
 ```bash
 cd codeshell/finetune
 ./run_finetune.sh $model_name_or_path $dataset_path $save_path
 ```
 
-By following these instructions, you'll be able to fine-tune the pretrained model to better suit your specific downstream tasks.
+按照这些步骤操作，您可以将预训练的模型微调，使其更加精确地适应您的特定任务。
+
+请注意，该微调脚本基于qwen、fastchat 和 tatsu-lab/stanford_alpaca 的微调脚本。
