@@ -204,7 +204,7 @@ Code Shell使用GPT-2作为基础架构，采用Grouped-Query Attention、RoPE�
 
 ### Data
 
-CodeShell基于Big Code开源的Stack数据集进行训练。在原始数据集的基础上，CodeShell采用基于Minihash对数据去重，基于KenLM以及高质量数据筛选模型对数据进行了过滤与筛选，最终得到高质量的预训练数据集。
+CodeShell基于自己爬取的Github数据、Big Code开源的Stack和StarCoder数据集、以及少量高质量的中英文数据进行训练。在原始数据集的基础上，CodeShell采用基于Minihash对数据去重，基于KenLM以及高质量数据筛选模型对数据进行了过滤与筛选，最终得到高质量的预训练数据集。
 
 ### Tokenizer
 
