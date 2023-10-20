@@ -139,16 +139,8 @@ Developers can also interact with CodeShell-7B-Chat through VS Code and JetBrain
 CodeShell supports 4 bit/8 bit quantization. After 4-bit quantization, the memory footprint is approximately 6GB, allowing users to use CodeShell on GPUs with smaller memory.
 
 ```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-tokenizer = AutoTokenizer.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True)
-model = model.quantize(4).cuda()
-
-inputs = tokenizer('def print_hello_world():', return_tensors='pt').cuda()
-outputs = model.generate(inputs)
-print(tokenizer.decode(outputs[0]))
+model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4', trust_remote_code=True).to(device)
+tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4')
 ```
 
 ### CodeShell in c/c++
@@ -179,6 +171,22 @@ CodeShell also offers a deployment method based on the OpenAI API.
 
 ```
 python openai_api.py
+```
+
+Then you can interact with CodeShell via HTTP requests:
+
+```
+curl http://127.0.0.1:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "CodeShell-7B-Chat",
+    "messages": [
+      {
+        "role": "user",
+        "content": "你好"
+      }
+    ]
+  }'
 ```
 
 ### IDE
