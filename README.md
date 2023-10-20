@@ -83,10 +83,11 @@ pip install -r requirements.txt
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 tokenizer = AutoTokenizer.from_pretrained("WisdomShell/CodeShell-7B")
-model = AutoModelForCausalLM.from_pretrained("WisdomShell/CodeShell-7B", trust_remote_code=True, torch_dtype=torch.bfloat16).cuda()
-inputs = tokenizer('def merge_sort():', return_tensors='pt').cuda()
-outputs = model.generate(inputs)
+model = AutoModelForCausalLM.from_pretrained("WisdomShell/CodeShell-7B", trust_remote_code=True, torch_dtype=torch.bfloat16).to(device)
+inputs = tokenizer('def merge_sort():', return_tensors='pt').to(device)
+outputs = model.generate(**inputs)
 print(tokenizer.decode(outputs[0]))
 ```
 
@@ -96,8 +97,8 @@ CodeShell 支持Fill-in-the-Middle模式，从而更好的支持软件开发过�
 
 ```python
 input_text = "<fim_prefix>def print_hello_world():\n    <fim_suffix>\n    print('Hello world!')<fim_middle>"
-inputs = tokenizer(input_text, return_tensors='pt').cuda()
-outputs = model.generate(inputs)
+inputs = tokenizer(input_text, return_tensors='pt').to(device)
+outputs = model.generate(**inputs)
 print(tokenizer.decode(outputs[0]))
 ```
 
@@ -106,7 +107,7 @@ print(tokenizer.decode(outputs[0]))
 CodeShell同时开源了代码助手模型CodeShell-7B-Chat，开发者可以通过下列代码与模型进行交互。
 
 ```python
-model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat', trust_remote_code=True, torch_dtype=torch.bfloat16).cuda()
+model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat', trust_remote_code=True, torch_dtype=torch.bfloat16).to(device)
 tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat')
 
 history = []
