@@ -373,6 +373,7 @@ if __name__ == "__main__":
         device_map=args.device,
         trust_remote_code=True,
         resume_download=True,
+        torch_dtype=torch.bfloat16
     ).eval()
 
     model.generation_config = GenerationConfig.from_pretrained(

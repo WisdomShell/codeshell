@@ -79,10 +79,8 @@ Developers can use CodeShell to quickly generate code, accelerating development 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained("WisdomShell/
-CodeShell-7B")
-model = AutoModelForCausalLM.from_pretrained("WisdomShell/
-CodeShell-7B", trust_remote_code=True).cuda()
+tokenizer = AutoTokenizer.from_pretrained("WisdomShell/CodeShell-7B")
+model = AutoModelForCausalLM.from_pretrained("WisdomShell/CodeShell-7B", trust_remote_code=True, torch_dtype=torch.bfloat16).cuda()
 inputs = tokenizer('def merge_sort():', return_tensors='pt').cuda()
 outputs = model.generate(inputs)
 print(tokenizer.decode(outputs[0]))
@@ -92,14 +90,6 @@ print(tokenizer.decode(outputs[0]))
 CodeShell supports the Fill-in-the-Middle mode to better assist the software development process.
 
 ```python
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-tokenizer = AutoTokenizer.from_pretrained("WisdomShell/
-CodeShell-7B")
-model = AutoModelForCausalLM.from_pretrained("WisdomShell/
-CodeShell-7B", trust_remote_code=True).cuda()
-
 input_text = "<fim_prefix>def print_hello_world():\n    <fim_suffix>\n    print('Hello world!')<fim_middle>"
 inputs = tokenizer(input_text, return_tensors='pt').cuda()
 outputs = model.generate(inputs)
@@ -110,15 +100,7 @@ print(tokenizer.decode(outputs[0]))
 CodeShell has also open-sourced the CodeShell-7B-Chat code assistant model. Developers can interact with the model using the following code.
 
 ```python
-import time
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-device = torch.device('cuda:0')
-# CodeShell-7B-Chat quantized version, smaller memory footprint
-# model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4', trust_remote_code=True).to(device)
-# tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4')
-model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat', trust_remote_code=True).to(device)
+model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat', trust_remote_code=True, torch_dtype=torch.bfloat16).cuda()
 tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat')
 
 history = []

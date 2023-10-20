@@ -69,6 +69,7 @@ def _load_model_tokenizer(args):
         device_map=args.device,
         trust_remote_code=True,
         resume_download=True,
+        torch_dtype=torch.bfloat16
     ).eval()
 
     config = GenerationConfig.from_pretrained(
