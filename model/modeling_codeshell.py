@@ -29,15 +29,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""PyTorch CodeShellGPT model."""
+"""PyTorch CodeShell model."""
+import os
 import math
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Callable
+from threading import Thread
+from queue import Queue
+
 
 import torch
 import torch.utils.checkpoint
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+
+from transformers import LogitsProcessorList, StoppingCriteriaList, StoppingCriteria, PreTrainedModel, PretrainedConfig
+from transformers.generation.utils import GenerationConfig
 
 from transformers.activations import ACT2FN
 from transformers.modeling_outputs import (
@@ -48,12 +54,8 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.utils import (
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
-    logging,
 )
 from .configuration_codeshell import CodeShellConfig
-
-
-logger = logging.get_logger(__name__)
 
 # Fused kernels
 # Use separate functions for each case because conditionals prevent kernel fusion.
@@ -85,7 +87,7 @@ def masked_softmax(x: torch.Tensor, mask: torch.Tensor, mask_value: torch.Tensor
     return x
 
 
-class LlamaRotaryEmbedding(torch.nn.Module):
+class CodeShellRotaryEmbedding(torch.nn.Module):
     def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None):
         super().__init__()
 
@@ -121,8 +123,8 @@ class LlamaRotaryEmbedding(torch.nn.Module):
         )
 
 
-class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
-    """LlamaRotaryEmbedding extended with linear scaling. Credits to the Reddit user /u/kaiokendev"""
+class CodeShellLinearScalingRotaryEmbedding(CodeShellRotaryEmbedding):
+    """CodeShellRotaryEmbedding extended with linear scaling. Credits to the Reddit user /u/kaiokendev"""
 
     def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None, scaling_factor=1.0):
         self.scaling_factor = scaling_factor
@@ -140,8 +142,8 @@ class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
         self.register_buffer("sin_cached", emb.sin()[None, None, :, :].to(dtype), persistent=False)
 
 
-class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
-    """LlamaRotaryEmbedding extended with Dynamic NTK scaling. Credits to the Reddit users /u/bloc97 and /u/emozilla"""
+class CodeShellDynamicNTKScalingRotaryEmbedding(CodeShellRotaryEmbedding):
+    """ShellRotaryEmbedding extended with Dynamic NTK scaling. Credits to the Reddit users /u/bloc97 and /u/emozilla"""
 
     def __init__(self, dim, max_position_embeddings=2048, base=10000, device=None, scaling_factor=1.0):
         self.scaling_factor = scaling_factor
@@ -165,7 +167,6 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
         self.register_buffer("cos_cached", emb.cos()[None, None, :, :].to(dtype), persistent=False)
         self.register_buffer("sin_cached", emb.sin()[None, None, :, :].to(dtype), persistent=False)
 
-
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
@@ -183,6 +184,16 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
 
+def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
+    """
+    This is the equivalent of torch.repeat_interleave(x, dim=1, repeats=n_rep). The hidden states go from (batch,
+    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
+    """
+    batch, num_key_value_heads, slen, head_dim = hidden_states.shape
+    if n_rep == 1:
+        return hidden_states
+    hidden_states = hidden_states[:, :, None, :, :].expand(batch, num_key_value_heads, n_rep, slen, head_dim)
+    return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
 
 class CodeShellAttention(nn.Module):
     def __init__(self, config, layer_idx=None):
@@ -195,6 +206,7 @@ class CodeShellAttention(nn.Module):
         
         self.group_query_attention = config.group_query_attention
         self.num_query_groups = config.num_query_groups
+        self.num_key_value_groups = config.num_attention_heads // config.num_query_groups
         
         self.embed_dim = config.hidden_size
         self.num_heads = config.num_attention_heads
@@ -208,16 +220,9 @@ class CodeShellAttention(nn.Module):
                 f" {self.num_heads})."
             )
 
-        self.scale_attn_weights = config.scale_attn_weights
-
         self.layer_idx = layer_idx
-        self.attention_softmax_in_fp32 = config.attention_softmax_in_fp32
-        self.scale_attention_softmax_in_fp32 = (
-            config.scale_attention_softmax_in_fp32 and config.attention_softmax_in_fp32
-        )
 
         self.c_attn = nn.Linear(self.embed_dim, self.embed_dim + 2 * self.kv_dim)
-
         self.c_proj = nn.Linear(self.embed_dim, self.embed_dim)
 
         self.attn_dropout = nn.Dropout(config.attn_pdrop)
@@ -228,16 +233,16 @@ class CodeShellAttention(nn.Module):
 
     def _init_rope(self):
         if self.rope_scaling is None:
-            self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
+            self.rotary_emb = CodeShellRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
         else:
             scaling_type = self.rope_scaling["type"]
             scaling_factor = self.rope_scaling["factor"]
             if scaling_type == "linear":
-                self.rotary_emb = LlamaLinearScalingRotaryEmbedding(
+                self.rotary_emb = CodeShellLinearScalingRotaryEmbedding(
                     self.head_dim, max_position_embeddings=self.max_position_embeddings, scaling_factor=scaling_factor
                 )
             elif scaling_type == "dynamic":
-                self.rotary_emb = LlamaDynamicNTKScalingRotaryEmbedding(
+                self.rotary_emb = CodeShellDynamicNTKScalingRotaryEmbedding(
                     self.head_dim, max_position_embeddings=self.max_position_embeddings, scaling_factor=scaling_factor
                 )
             else:
@@ -250,89 +255,6 @@ class CodeShellAttention(nn.Module):
             self.mask_value = torch.full([], torch.finfo(dtype).min, dtype=dtype, device=device)
         return self.mask_value
 
-    def _attn(self, query, key, value, attention_mask=None, head_mask=None):
-        dtype = query.dtype
-        softmax_dtype = torch.float32 if self.attention_softmax_in_fp32 else dtype
-        upcast = dtype != softmax_dtype
-
-        unscale = self.layer_idx + 1 if self.scale_attention_softmax_in_fp32 and upcast else 1
-        scale_factor = unscale**-1
-        if self.scale_attn_weights:
-            scale_factor /= self.head_dim**0.5
-
-        # [b, np, sq, sk]
-        output_size = (query.size(1),
-                       query.size(2),
-                       query.size(0),
-                       key.size(0))
-        attn_view = (output_size[0]*output_size[1], output_size[2], output_size[3])
-        
-        # [sq, b, np, hn] -> [sq, b * np, hn]
-        query = query.reshape(output_size[2],
-                            output_size[0] * output_size[1], -1)
-        # [sk, b, np, hn] -> [sk, b * np, hn]
-        key = key.reshape(output_size[3],
-                        output_size[0] * output_size[1], -1)
-        attn_weights = torch.empty(attn_view, device=query.device, dtype=query.dtype)
-        if query.device.type == "cpu":
-            # This is needed because of a bug in pytorch https://github.com/pytorch/pytorch/issues/80588.
-            # The bug was fixed in https://github.com/pytorch/pytorch/pull/96086,
-            # but the fix has not been released as of pytorch version 2.0.0.
-            attn_weights = torch.zeros_like(attn_weights)
-            beta = 1
-        else:
-            beta = 0
-        
-        attn_weights = torch.baddbmm(attn_weights, 
-                                     query.transpose(0, 1), 
-                                     key.transpose(0, 1).transpose(1, 2), 
-                                     beta=beta, alpha=scale_factor).reshape(output_size)
-
-        if upcast:
-            # Use a fused kernel to prevent a large overhead from casting and scaling.
-            # Sub-optimal when the key length is not a multiple of 8.
-            if attention_mask is None:
-                attn_weights = upcast_softmax(attn_weights, unscale, softmax_dtype)
-            else:
-                mask_value = self._get_mask_value(attn_weights.device, softmax_dtype)
-                attn_weights = upcast_masked_softmax(attn_weights, attention_mask, mask_value, unscale, softmax_dtype)
-        else:
-            if attention_mask is not None:
-                mask_value = self._get_mask_value(attn_weights.device, softmax_dtype)
-
-                # The fused kernel is very slow when the key length is not a multiple of 8, so we skip fusion.
-                attn_weights = torch.where(attention_mask, attn_weights, mask_value)
-
-            attn_weights = torch.nn.functional.softmax(attn_weights, dim=-1)
-        
-        attn_weights = self.attn_dropout(attn_weights)
-        
-        attn_weights = attn_weights.reshape(attn_view)
-        
-        # value_layer -> context layer.
-        # [sk, b, np, hn] --> [b, np, sq, hn]
-
-        # context layer shape: [b, np, sq, hn]
-        output_size = (value.size(1),
-                       value.size(2),
-                       query.size(0),
-                       value.size(3))
-        
-        # change view [sk, b * np, hn]
-        value = value.reshape(value.size(0),
-                            output_size[0] * output_size[1], -1)
-        attn_output = torch.bmm(attn_weights, value.transpose(0, 1))
-        
-        # change view [b, np, sq, hn]
-        attn_output = attn_output.reshape(*output_size)
-        # [b, np, sq, hn] --> [sq, b, np, hn]
-        attn_output = attn_output.permute(2, 0, 1, 3).contiguous()
-
-        # [sq, b, np, hn] --> [sq, b, hp]
-        attn_output = attn_output.reshape(attn_output.size(0), attn_output.size(1), -1)
-        
-        return attn_output, attn_weights
-
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -340,74 +262,75 @@ class CodeShellAttention(nn.Module):
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.Tensor] = None,
-        encoder_hidden_states: Optional[torch.Tensor] = None,
-        encoder_attention_mask: Optional[torch.Tensor] = None,
         use_cache: Optional[bool] = False,
         output_attentions: Optional[bool] = False,
     ) -> Union[
         Tuple[torch.Tensor, Optional[torch.Tensor]],
         Tuple[torch.Tensor, Optional[torch.Tensor], Tuple[torch.Tensor, ...]],
     ]:
-        if self.group_query_attention:
-            query, key_value = self.c_attn(hidden_states).split((self.embed_dim, 2 * self.kv_dim), dim=2)
-        else:
-            # Note: We split as (self.num_heads, 3, self.head_dim) instead of (3, self.num_heads, self.head_dim),
-            # i.e., the memory layout is not the same as GPT2.
-            # This makes the concatenation with past_key_value more efficient.
-            query, key_value = (
-                self.c_attn(hidden_states)
-                .reshape(*hidden_states.shape[:2], self.num_heads, 3 * self.head_dim)
-                .transpose(1, 2)
-                .split((self.head_dim, 2 * self.head_dim), dim=3)
-            )
+        bsz, q_len, _ = hidden_states.size()
+        query_states, key_states, value_states = self.c_attn(hidden_states).split((self.embed_dim, self.kv_dim, self.kv_dim), dim=2)
         
-        query = query.reshape(query.size(0), query.size(1), -1, self.head_dim)
+        query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        key_states = key_states.view(bsz, q_len, self.num_query_groups, self.head_dim).transpose(1, 2)
+        value_states = value_states.view(bsz, q_len, self.num_query_groups, self.head_dim).transpose(1, 2)
         
-        key, value = key_value.split((self.head_dim*self.num_query_groups, self.head_dim*self.num_query_groups), dim=-1)
-        # expand the key_layer and value_layer [sk, b, ng, hn] -> [sk, b, np, hn]
-        key = key.reshape(key.size(0), key.size(1), -1, self.head_dim)
-        value = value.reshape(value.size(0), value.size(1), -1, self.head_dim)
-        
-        key = key.repeat_interleave(
-            self.num_heads // self.num_query_groups,
-            dim = 2
-        )
-        value = value.repeat_interleave(
-            self.num_heads // self.num_query_groups,
-            dim = 2
-        )
-        
-        if self.position_embedding_type == "rope":
-            kv_seq_len = key.shape[-3]
-            if layer_past is not None:
-                kv_seq_len += layer_past[0].shape[-3]
-            
-            cos, sin = self.rotary_emb(value, seq_len=kv_seq_len)
-            query = query.transpose(1, 2).contiguous()
-            key = key.transpose(1, 2).contiguous()
-            query, key = apply_rotary_pos_emb(query, key, cos, sin, position_ids)
-            query = query.transpose(1, 2).contiguous()
-            key = key.transpose(1, 2).contiguous()
-            
+        kv_seq_len = key_states.shape[-2]
         if layer_past is not None:
-            key = torch.cat((layer_past[0], key), dim=-3)
-            value = torch.cat((layer_past[1], value), dim=-3)
-        present = (key, value) if use_cache else None
+            kv_seq_len += layer_past[0].shape[-2]
+        cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
-        attn_output, attn_weights = self._attn(query.transpose(0, 1), key.transpose(0, 1), value.transpose(0, 1), attention_mask, head_mask)
-        
-        attn_output = attn_output.transpose(0, 1).reshape(hidden_states.shape)
+        if layer_past is not None:
+            # reuse k, v, self_attention
+            key_states = torch.cat([layer_past[0], key_states], dim=2)
+            value_states = torch.cat([layer_past[1], value_states], dim=2)
+
+        layer_past = (key_states, value_states) if use_cache else None
+
+        # repeat k/v heads if n_kv_heads < n_heads
+        key_states = repeat_kv(key_states, self.num_heads // self.kv_heads)
+        value_states = repeat_kv(value_states, self.num_heads // self.kv_heads)
+    
+        attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+
+        if attn_weights.size() != (bsz, self.num_heads, q_len, kv_seq_len):
+            raise ValueError(
+                f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
+                f" {attn_weights.size()}"
+            )
+
+        if attention_mask is not None:
+            if attention_mask.size() != (bsz, 1, q_len, kv_seq_len):
+                raise ValueError(
+                    f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.size()}"
+                )
+            mask_value = self._get_mask_value(attn_weights.device, attn_weights.dtype)
+            # The fused kernel is very slow when the key length is not a multiple of 8, so we skip fusion.
+            attn_weights = torch.where(attention_mask, attn_weights, mask_value)
+
+        # upcast attention to fp32
+        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+        attn_weights = self.attn_dropout(attn_weights)
+        attn_output = torch.matmul(attn_weights, value_states)
+
+        if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
+            raise ValueError(
+                f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
+                f" {attn_output.size()}"
+            )
+
+        attn_output = attn_output.transpose(1, 2).contiguous()
+        attn_output = attn_output.reshape(bsz, q_len, self.embed_dim)
+
         attn_output = self.c_proj(attn_output)
         attn_output = self.resid_dropout(attn_output)
-
-        outputs = (attn_output, present)
-        if output_attentions:
-            if self.group_query_attention:
-                # Transpose to return weights in the usual format (batch_size, num_heads, query_length, key_length)
-                attn_weights = attn_weights.transpose(1, 2)
-            outputs += (attn_weights,)
         
-        return outputs  # a, present, (attentions)
+        outputs = (attn_output, layer_past)
+        if output_attentions:
+            outputs += (attn_weights,)
+
+        return outputs # a, present, (attentions)
 
 
 class CodeShellMLP(nn.Module):
@@ -494,7 +417,7 @@ class CodeShellPreTrainedModel(PreTrainedModel):
     config_class = CodeShellConfig
     base_model_prefix = "transformer"
     supports_gradient_checkpointing = True
-    _no_split_modules = ["CodeShellBlock"]
+    _no_split_modules = ["ShellBlock"]
     _skip_keys_device_placement = "past_key_values"
 
     def __init__(self, *inputs, **kwargs):
@@ -527,22 +450,19 @@ class CodeShellPreTrainedModel(PreTrainedModel):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
 
-    # Copied from transformers.models.gpt2.modeling_gpt2.GPT2PreTrainedModel._set_gradient_checkpointing with GPT2->CodeShell
+    # Copied from transformers.models.gpt2.modeling_gpt2.GPT2PreTrainedModel._set_gradient_checkpointing with GPT2->Shell
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, CodeShellModel):
             module.gradient_checkpointing = value
 
 
 GPT_BIGCODE_START_DOCSTRING = r"""
-
     This model inherits from [`PreTrainedModel`]. Check the superclass documentation for the generic methods the
     library implements for all its model (such as downloading or saving, resizing the input embeddings, pruning heads
     etc.)
-
     This model is also a PyTorch [torch.nn.Module](https://pytorch.org/docs/stable/nn.html#torch.nn.Module) subclass.
     Use it as a regular PyTorch Module and refer to the PyTorch documentation for all matter related to general usage
     and behavior.
-
     Parameters:
         config ([`CodeShellConfig`]): Model configuration class with all the parameters of the model.
             Initializing with a config file does not load the weights associated with the model, only the
@@ -555,13 +475,10 @@ GPT_BIGCODE_INPUTS_DOCSTRING = r"""
             `input_ids_length` = `sequence_length` if `past_key_values` is `None` else
             `past_key_values[0][0].shape[-2]` (`sequence_length` of input past key value states). Indices of input
             sequence tokens in the vocabulary.
-
             If `past_key_values` is used, only `input_ids` that do not have their past calculated should be passed as
             `input_ids`.
-
             Indices can be obtained using [`AutoTokenizer`]. See [`PreTrainedTokenizer.encode`] and
             [`PreTrainedTokenizer.__call__`] for details.
-
             [What are input IDs?](../glossary#input-ids)
         past_key_values (`Tuple[torch.Tensor]` of length `config.n_layers`):
             Contains precomputed hidden-states (key and values in the attention blocks) as computed by the model (see
@@ -569,39 +486,30 @@ GPT_BIGCODE_INPUTS_DOCSTRING = r"""
             their past given to this model should not be passed as `input_ids` as they have already been computed.
         attention_mask (`torch.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
             Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
-
             - 1 for tokens that are **not masked**,
             - 0 for tokens that are **masked**.
-
             If `past_key_values` is used, `attention_mask` needs to contain the masking strategy that was used for
             `past_key_values`. In other words, the `attention_mask` always has to have the length:
             `len(past_key_values) + len(input_ids)`
-
             [What are attention masks?](../glossary#attention-mask)
         token_type_ids (`torch.Tensor` of shape `(batch_size, input_ids_length)`, *optional*):
             Segment token indices to indicate first and second portions of the inputs. Indices are selected in `[0,
             1]`:
-
             - 0 corresponds to a *sentence A* token,
             - 1 corresponds to a *sentence B* token.
-
             [What are token type IDs?](../glossary#token-type-ids)
         position_ids (`torch.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
             Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
             config.max_position_embeddings - 1]`.
-
             [What are position IDs?](../glossary#position-ids)
         head_mask (`torch.Tensor` of shape `(num_heads,)` or `(num_layers, num_heads)`, *optional*):
             Mask to nullify selected heads of the self-attention modules. Mask values selected in `[0, 1]`:
-
             - 1 indicates the head is **not masked**,
             - 0 indicates the head is **masked**.
-
         inputs_embeds (`torch.Tensor` of shape `(batch_size, sequence_length, hidden_size)`, *optional*):
             Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation. This
             is useful if you want more control over how to convert `input_ids` indices into associated vectors than the
             model's internal embedding lookup matrix.
-
             If `past_key_values` is used, optionally only the last `inputs_embeds` have to be input (see
             `past_key_values`).
         use_cache (`bool`, *optional*):
@@ -706,7 +614,7 @@ class CodeShellModel(CodeShellPreTrainedModel):
             past_length = 0
             past_key_values = tuple([None] * len(self.h))
         else:
-            past_length = past_key_values[0][0].size(-3)
+            past_length = past_key_values[0][0].size(-2)
 
         if attention_mask is not None and len(attention_mask.shape) == 2 and position_ids is None:
             # create position_ids on the fly for batch generation
@@ -822,6 +730,62 @@ class CodeShellModel(CodeShellPreTrainedModel):
             hidden_states=all_hidden_states,
             attentions=all_self_attentions,
         )
+    
+class EndOfFunctionCriteria(StoppingCriteria):
+    """Custom `StoppingCriteria` which checks if all generated functions in the batch are completed."""
+    def __init__(self, input_lengths, eof_strings, tokenizer):
+        self.input_lengths = input_lengths
+        self.eof_strings = eof_strings
+        self.tokenizer = tokenizer
+
+    def __call__(self, input_ids, scores, **kwargs):
+        """Returns true if all generated sequences contain any of the end-of-function strings."""
+        decoded_generations = []
+        for _input_ids, input_length in zip(input_ids, self.input_lengths):
+            decoded_generations.append(self.tokenizer.decode(_input_ids[input_length:]))
+        done = []
+        for decoded_generation in decoded_generations:
+            done.append(
+                any(
+                    [
+                        stop_string in decoded_generation
+                        for stop_string in self.eof_strings
+                    ]
+                )
+            )
+        return all(done)
+
+class TextIterStreamer:
+    def __init__(self, tokenizer, skip_prompt=False, skip_special_tokens=False):
+        self.tokenizer = tokenizer
+        self.skip_prompt = skip_prompt
+        self.skip_special_tokens = skip_special_tokens
+        self.tokens = []
+        self.text_queue = Queue()
+        self.next_tokens_are_prompt = True
+
+    def put(self, value):
+        if self.skip_prompt and self.next_tokens_are_prompt:
+            self.next_tokens_are_prompt = False
+        else:
+            if len(value.shape) > 1:
+                value = value[0]
+            self.tokens.extend(value.tolist())
+            self.text_queue.put(
+                self.tokenizer.decode(self.tokens, skip_special_tokens=self.skip_special_tokens))
+
+    def end(self):
+        self.text_queue.put(None)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        value = self.text_queue.get()
+        if value is None:
+            raise StopIteration()
+        else:
+            return value
 
 
 @add_start_docstrings(
@@ -845,10 +809,10 @@ class CodeShellForCausalLM(CodeShellPreTrainedModel):
     def quantize(self, bits: int):
         try:
             import bitsandbytes
-            from .quantizer import quantize_online
+            from .quantizer import quantize
         except ImportError:
             raise ImportError(f"Needs bitsandbytes to run quantize.")
-        return quantize_online(self, bits)
+        return quantize(self, bits)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -965,3 +929,143 @@ class CodeShellForCausalLM(CodeShellPreTrainedModel):
                 tuple(past_state.index_select(0, beam_idx.to(past_state.device)) for past_state in layer_past),
             )
         return reordered_past
+    
+
+    def build_chat_input(self, query, history, tokenizer, max_new_tokens=None):
+        user_name = "## human:"
+        ai_name = "## assistant: "
+        stop = '|<end>|'
+
+        prompt = ''
+        for q, r in history:
+            prompt += f"{user_name}{q}{stop}"
+            prompt += f"{ai_name}{r}{stop}"
+        prompt += f"{user_name}{query}{stop}"
+        prompt += ai_name.rstrip()
+
+        max_new_tokens = max_new_tokens or self.generation_config.max_new_tokens
+        max_input_tokens = self.config.n_positions - max_new_tokens
+
+        input_tokens = tokenizer.encode(prompt)
+        input_tokens = input_tokens[-max_input_tokens:]  # truncate left
+        return torch.LongTensor([input_tokens]).to(self.device)
+
+    def chat(self, query, history, tokenizer, stream=False,
+            generation_config: Optional[GenerationConfig]=None):
+        generation_config = generation_config or self.generation_config
+        input_ids = self.build_chat_input(query, history, tokenizer, generation_config.max_new_tokens)
+        stopping_criteria = StoppingCriteriaList(
+            [EndOfFunctionCriteria([len(input_ids[0])], ['|<end>|', '|end|', '<|endoftext|>', '## human'], tokenizer)]
+        )
+        
+        if stream:
+            streamer = TextIterStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+            Thread(target=self.generate, kwargs=dict(
+                inputs=input_ids, streamer=streamer,
+                stopping_criteria = stopping_criteria,
+                generation_config=generation_config,
+            )).start()
+            return streamer
+        else:
+            outputs = self.generate(input_ids, generation_config=generation_config, stopping_criteria = stopping_criteria)
+            response = tokenizer.decode(outputs[0][len(input_ids[0]):], skip_special_tokens=True)
+            return response
+        
+    def generate_stream(self, prompt, tokenizer, generation_config=None, **kwargs):
+        generation_config = generation_config or self.generation_config
+        max_input_tokens = self.config.n_positions - self.generation_config.max_new_tokens
+
+        input_ids = tokenizer.encode(prompt)
+        input_ids = input_ids[-max_input_tokens:]  # truncate left
+
+        stopping_criteria = StoppingCriteriaList(
+            [EndOfFunctionCriteria([len(input_ids[0])], ['|<end>|', '|end|', '<|endoftext|>', '## human'], tokenizer)]
+        )
+
+        streamer = TextIterStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+        Thread(target=self.generate, kwargs=dict(
+            inputs=input_ids, stopping_criteria=stopping_criteria, **kwargs
+        )).start()
+        return streamer
+
+
+class CodeShell4bitForCausalLM(CodeShellForCausalLM):
+    def __init__(self, config):
+        CodeShellPreTrainedModel.__init__(self, config)  
+        self.transformer = CodeShellModel(config)
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
+        try:
+            import bitsandbytes
+            from .quantizer import quantize_offline
+            quantize_offline(self)
+        except ImportError:
+            raise ImportError(f"Needs bitsandbytes to run quantize.")
+        
+        self.post_init()
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: Optional[Union[str, os.PathLike]],
+        *model_args,
+        config: Optional[Union[PretrainedConfig, str, os.PathLike]] = None,
+        cache_dir: Optional[Union[str, os.PathLike]] = None,
+        ignore_mismatched_sizes: bool = False,
+        force_download: bool = False,
+        local_files_only: bool = False,
+        token: Optional[Union[str, bool]] = None,
+        revision: str = "main",
+        use_safetensors: bool = None,
+        **kwargs,
+    ):
+        if not isinstance(config, PretrainedConfig):
+            config_path = config if config is not None else pretrained_model_name_or_path
+            config, _ = cls.config_class.from_pretrained(
+                config_path,
+                cache_dir=cache_dir,
+                return_unused_kwargs=True,
+                force_download=force_download,
+                resume_download=False,
+                proxies=None,
+                local_files_only=local_files_only,
+                token=token,
+                revision=revision,
+                subfolder="",
+                _from_auto=False,
+                _from_pipeline=None,
+                **kwargs,
+            )
+            
+        # Load config if we don't provide a configuration
+        from .quantizer import load_state_dict_for_qunantied_model
+        model = cls(config)
+        state_dict = torch.load(os.path.join(pretrained_model_name_or_path, 'pytorch_model.bin'), map_location="cpu") 
+        model = load_state_dict_for_qunantied_model(model, state_dict)
+        model.eval()
+        
+        # If it is a model with generation capabilities, attempt to load the generation config
+        if model.can_generate():
+            try:
+                model.generation_config = GenerationConfig.from_pretrained(
+                    pretrained_model_name_or_path,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    resume_download=False,
+                    proxies=None,
+                    local_files_only=local_files_only,
+                    token=token,
+                    revision=revision,
+                    subfolder="",
+                    _from_auto=False,
+                    _from_pipeline=None,
+                    **kwargs,
+                )
+            except (OSError, TypeError):
+                pass
+
+        device_map = kwargs.pop("device_map", None)
+        if device_map is not None:
+            model = model.to(torch.device(device_map))
+        
+        return model

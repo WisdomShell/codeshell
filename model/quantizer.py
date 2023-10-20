@@ -22,13 +22,27 @@ import torch
 
 def Params4bitCuda(self, device):
     self.data = self.data.cuda(device)
-    self.quant_state[0] = self.quant_state[0].cuda(device)
-    self.quant_state[4][0] = self.quant_state[4][0].cuda(device)
-    self.quant_state[4][1][0] = self.quant_state[4][1][0].cuda(device)
-    self.quant_state[4][1][1] = self.quant_state[4][1][1].cuda(device)
-
-    self.quant_state[6] = self.quant_state[6].cuda(device)
+    if self.quant_state is not None:
+        self.quant_state[0] = self.quant_state[0].cuda(device)
+        self.quant_state[6] = self.quant_state[6].cuda(device)
     return self
+
+def Params4bitTo(self, *args, **kwargs):
+    device, dtype, non_blocking, convert_to_format = torch._C._nn._parse_to(*args, **kwargs)
+
+    if (device is not None and device.type == "cuda" and self.data.device.type == "cpu"):
+        return self.cuda(device)
+    else:
+        if self.quant_state is not None:
+            # make sure the quantization state is on the right device
+            self.quant_state[0] = self.quant_state[0].to(device)
+            self.quant_state[6] = self.quant_state[6].to(device)
+        new_param = Params4bit(self.to(device=device, dtype=dtype, non_blocking=non_blocking),
+                                requires_grad=self.requires_grad, quant_state=self.quant_state,
+                                blocksize=self.blocksize, compress_statistics=self.compress_statistics,
+                                quant_type=self.quant_type)
+
+    return new_param
 
 class Linear4bitOnline(torch.nn.Module):
     def __init__(self, weight, bias, quant_type):
@@ -153,4 +167,97 @@ def quantize_online(model, bits: int):
         layer.attn.c_attn=auto_quant(layer.attn.c_attn)
         layer.attn.c_proj=auto_quant(layer.attn.c_proj)
 
+    return model
+
+
+general_weight_dict = {
+    "transformer.wte.weight": False,
+    "transformer.ln_f.weight": False,
+    "transformer.ln_f.bias": False,
+    "lm_head.weight": False,
+}
+
+layer_weight_dict = {
+    "transformer.h.{i}.ln_1.weight": False,
+    "transformer.h.{i}.ln_1.bias": False,
+    "transformer.h.{i}.attn.c_attn.weight": True,
+    "transformer.h.{i}.attn.c_attn.bias": False,
+    "transformer.h.{i}.attn.c_proj.weight": True,
+    "transformer.h.{i}.attn.c_proj.bias": False,
+    "transformer.h.{i}.attn.rotary_emb.inv_freq": False,
+    "transformer.h.{i}.ln_2.weight": False,
+    "transformer.h.{i}.ln_2.bias": False,
+    "transformer.h.{i}.mlp.c_fc.weight": True,
+    "transformer.h.{i}.mlp.c_fc.bias": False,
+    "transformer.h.{i}.mlp.c_proj.weight": True,
+    "transformer.h.{i}.mlp.c_proj.bias": False,
+}
+num_dict = {str(i):i for i in range(100)}
+
+def set_value(model, name, state_dict, is_4bit):
+    keys = name.split('.')
+    parent = model
+    for key in keys[:-1]:
+        if key in num_dict:
+            parent = parent[num_dict[key]]
+        else:
+            parent = getattr(parent, key)
+    if is_4bit:
+        weight_data = state_dict[f'{name}.data']
+        weight_quant_state = state_dict[f'{name}.quant_state']
+        assert weight_data is not None, name
+        assert weight_quant_state is not None, name
+        setattr(parent, keys[-1], Params4bit(weight_data, requires_grad=False, quant_state=weight_quant_state))
+    else:
+        setattr(parent, keys[-1], state_dict[name])
+
+def quantize_offline(model):
+    for i, layer in enumerate(model.transformer.h):
+        layer.mlp.c_fc = bnb.nn.Linear4bit(
+                            layer.mlp.c_fc.weight.shape[1],
+                            layer.mlp.c_fc.weight.shape[0],
+                            False,
+                            torch.bfloat16,
+                            compress_statistics=True,
+                            quant_type="nf4",
+                        )
+        layer.mlp.c_proj = bnb.nn.Linear4bit(
+                            layer.mlp.c_proj.weight.shape[1],
+                            layer.mlp.c_proj.weight.shape[0],
+                            False,
+                            torch.bfloat16,
+                            compress_statistics=True,
+                            quant_type="nf4",
+                        )
+
+        layer.attn.c_attn = bnb.nn.Linear4bit(
+                            layer.attn.c_attn.weight.shape[1],
+                            layer.attn.c_attn.weight.shape[0],
+                            False,
+                            torch.bfloat16,
+                            compress_statistics=True,
+                            quant_type="nf4",
+                        )
+        layer.attn.c_proj = bnb.nn.Linear4bit(
+                            layer.attn.c_proj.weight.shape[1],
+                            layer.attn.c_proj.weight.shape[0],
+                            False,
+                            torch.bfloat16,
+                            compress_statistics=True,
+                            quant_type="nf4",
+                        )
+    return model
+
+def load_state_dict_for_qunantied_model(model, state_dict):
+    #replace Params4bit.cuda with Params4bitCuda
+    Params4bit.cuda = Params4bitCuda
+    Params4bit.to = Params4bitTo
+
+    for name, is_4bit in general_weight_dict.items():
+        set_value(model, name, state_dict, is_4bit)
+                
+    for layer_i in range(len(model.transformer.h)):
+        for name, is_4bit in layer_weight_dict.items():
+            name = name.replace('{i}', str(layer_i))
+            set_value(model, name, state_dict, is_4bit)
     return model
