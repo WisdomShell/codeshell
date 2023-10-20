@@ -79,7 +79,7 @@ pip install -r requirements.txt
 
 开发者可以使用CodeShell快速生成代码，加速开发效率。
 
-```
+```python
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -96,7 +96,7 @@ print(tokenizer.decode(outputs[0]))
 
 CodeShell 支持Fill-in-the-Middle模式，从而更好的支持软件开发过程。
 
-```
+```python
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -115,15 +115,12 @@ print(tokenizer.decode(outputs[0]))
 
 CodeShell同时开源了代码助手模型CodeShell-7B-Chat，开发者可以通过下列代码与模型进行交互。
 
-```
+```python
 import time
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 device = torch.device('cuda:0')
-# CodeShell-7B-Chat量化版本，占用显存更小
-# model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4', trust_remote_code=True).to(device)
-# tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4')
 model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat', trust_remote_code=True).to(device)
 tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat')
 
@@ -139,7 +136,6 @@ print(response)
 history.append((query, response))
 ```
 
-
 开发者也可以通过VS Code与JetBrains插件与CodeShell-7B-Chat交互，详情请参[VSCode插件仓库](https://github.com/WisdomShell/codeshell-vscode)与[IntelliJ插件仓库](https://github.com/WisdomShell/codeshell-intellij)。
 
 
@@ -147,22 +143,14 @@ history.append((query, response))
 
 CodeShell 支持4 bit/8 bit量化，4 bit量化后，占用显存大小约6G，用户可以在显存较小的GPU上使用CodeShell。
 
-```
-from transformers import AutoModelForCausalLM, AutoTokenizer
-tokenizer = AutoTokenizer.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained("WisdomShell/
-CodeShell-Chat", trust_remote_code=True)
-model = model.quantize(4).cuda()
-
-inputs = tokenizer('def print_hello_world():', return_tensors='pt').cuda()
-outputs = model.generate(inputs)
-print(tokenizer.decode(outputs[0]))
+```python
+model = AutoModelForCausalLM.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4', trust_remote_code=True).to(device)
+tokenizer = AutoTokenizer.from_pretrained('WisdomShell/CodeShell-7B-Chat-int4')
 ```
 
 - CodeShell in c/c++
 
-由于大部分个人电脑没有GPU，CodeShell提供了C/C++版本的推理支持，开发者可以根据本地环境进行编译，详见[CodeShell C/C++本地化版]()。编译完成后，可以通过下列命令启动Web API服务。
+由于大部分个人电脑没有GPU，CodeShell提供了C/C++版本的推理支持，开发者可以根据本地环境进行编译与使用，详见[CodeShell C/C++本地化版](https://github.com/WisdomShell/llama_cpp_for_codeshell)。
 
 ## Demo
 
@@ -210,8 +198,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 
 ### IDE
 
-CodeShell最后提供了线上IDE，开发者可以通过IDE进行代码补全、代码问答等操作。同时，IDE插件也同时发布，开发者可以自行在本地进行安装使用，详情请参考[VSCode插件仓库](https://github.com/WisdomShell/codeshell-vscode)与[IntelliJ插件仓库](https://github.com/WisdomShell/codeshell-intellij)。
-
+CodeShell最后提供了线上IDE，开发者可以通过IDE进行代码补全、代码问答等操作。同时，IDE插件也同时发布，开发者可以自行在本地进行安装使用。插件相关问题欢迎在[VSCode插件仓库](https://github.com/WisdomShell/codeshell-vscode)与[IntelliJ插件仓库](https://github.com/WisdomShell/codeshell-intellij)中讨论。
 
 ## Model Details
 
@@ -232,7 +219,7 @@ Code Shell使用GPT-2作为基础架构，采用Grouped-Query Attention、RoPE�
 
 ### Data
 
-CodeShell基于Big Code开源的Stack数据集进行训练。在原始数据集的基础上，CodeShell采用基于Minihash对数据去重，基于KenLM以及高质量数据筛选模型对数据进行了过滤与筛选，最终得到高质量的预训练数据集。
+CodeShell基于自己爬取的Github数据、Big Code开源的Stack和StarCoder数据集、以及少量高质量的中英文数据进行训练。在原始数据集的基础上，CodeShell采用基于Minihash对数据去重，基于KenLM以及高质量数据筛选模型对数据进行了过滤与筛选，最终得到高质量的预训练数据集。
 
 ### Tokenizer
 
@@ -241,7 +228,7 @@ CodeShell基于Starcoder词表进行了优化，去除了使用频率较低的�
 
 | Tokenizer | Size | Chinese  | English | Code | Total|
 |---|---|---|---|---|---|
-| Statcoder | 49152 | 1.22 | 3.47 | 3.30 | 2.66 |
+| Starcoder | 49152 | 1.22 | 3.47 | 3.30 | 2.66 |
 | CodeShell | 70144 | 1.50 | 3.47 | 3.30 | 2.95 |
 
 
