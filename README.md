@@ -181,7 +181,7 @@ python demos/web_demo.py
 我们也提供了命令行交互的Demo版本，开发者可以通过下列命令运行。
 
 ```
-python cli_demo.py
+python demos/cli_demo.py
 ```
 
 ### API
@@ -189,12 +189,28 @@ python cli_demo.py
 CodeShell也提供了基于OpenAI API的部署方法。
 
 ```
-python openai_api.py
+python demos/openai_api.py
+```
+
+启动后即可通过HTTP请求与CodeShell交互。
+
+```
+curl http://127.0.0.1:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "CodeShell-7B-Chat",
+    "messages": [
+      {
+        "role": "user",
+        "content": "你好"
+      }
+    ]
+  }'
 ```
 
 ### IDE
 
-CodeShell最后提供了线上IDE，开发者可以通过IDE进行代码补全、代码问答等操作。同时，IDE插件也同时发布，开发者可以自行在本地进行安装使用。插件相关问题欢迎在[VS Code插件仓库]()中讨论。
+CodeShell最后提供了线上IDE，开发者可以通过IDE进行代码补全、代码问答等操作。同时，IDE插件也同时发布，开发者可以自行在本地进行安装使用，详情请参考[VSCode插件仓库](https://github.com/WisdomShell/codeshell-vscode)与[IntelliJ插件仓库](https://github.com/WisdomShell/codeshell-intellij)。
 
 
 ## Model Details

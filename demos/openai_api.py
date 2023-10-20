@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This code is based on Alibaba's opeai_api Demo. It has been modified from
+# This code is based on Qwen's opeai_api Demo. It has been modified from
 # its original forms to accommodate CodeShell.
 
 # coding=utf-8
@@ -25,6 +25,7 @@ import re
 import copy
 import json
 import time
+from copy import deepcopy
 from argparse import ArgumentParser
 from contextlib import asynccontextmanager
 from typing import Dict, List, Literal, Optional, Union
@@ -80,17 +81,13 @@ class ModelList(BaseModel):
     object: str = "list"
     data: List[ModelCard] = []
 
-
 class ChatMessage(BaseModel):
-    role: Literal["user", "assistant", "system", "function"]
+    role: Literal["user", "assistant"]
     content: Optional[str]
-    function_call: Optional[Dict] = None
-
 
 class DeltaMessage(BaseModel):
     role: Optional[Literal["user", "assistant", "system"]] = None
     content: Optional[str] = None
-
 
 class ChatCompletionRequest(BaseModel):
     model: str
@@ -106,7 +103,7 @@ class ChatCompletionRequest(BaseModel):
 class ChatCompletionResponseChoice(BaseModel):
     index: int
     message: ChatMessage
-    finish_reason: Literal["stop", "length", "function_call"]
+    finish_reason: Literal["stop", "length"]
 
 
 class ChatCompletionResponseStreamChoice(BaseModel):
@@ -127,50 +124,15 @@ class ChatCompletionResponse(BaseModel):
 @app.get("/v1/models", response_model=ModelList)
 async def list_models():
     global model_args
-    model_card = ModelCard(id="gpt-3.5-turbo")
+    model_card = ModelCard(id="CodeShell-7B-Chat")
     return ModelList(data=[model_card])
-
-
-# To work around that unpleasant leading-\n tokenization issue!
-def add_extra_stop_words(stop_words):
-    if stop_words:
-        _stop_words = []
-        _stop_words.extend(stop_words)
-        for x in stop_words:
-            s = x.lstrip("\n")
-            if s and (s not in _stop_words):
-                _stop_words.append(s)
-        return _stop_words
-    return stop_words
-
 
 def trim_stop_words(response):
     response = response.replace('|end|', '')
     response = response.replace('|<end>|', '')
     return response
 
-
-TOOL_DESC = """{name_for_model}: Call this tool to interact with the {name_for_human} API. What is the {name_for_human} API useful for? {description_for_model} Parameters: {parameters}"""
-
-REACT_INSTRUCTION = """Answer the following questions as best you can. You have access to the following APIs:
-
-{tools_text}
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{tools_name_text}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can be repeated zero or more times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Begin!"""
-
 _TEXT_COMPLETION_CMD = object()
-
 
 #
 # Temporarily, the system role does not work as expected.
@@ -179,7 +141,7 @@ _TEXT_COMPLETION_CMD = object()
 #
 # TODO: Use real system role when the model is ready.
 #
-def parse_messages(messages, functions):
+def parse_messages(messages):
     if all(m.role != "user" for m in messages):
         raise HTTPException(
             status_code=400,
@@ -187,62 +149,14 @@ def parse_messages(messages, functions):
         )
 
     messages = copy.deepcopy(messages)
-    default_system = "You are a helpful assistant."
-    system = ""
-    if messages[0].role == "system":
-        system = messages.pop(0).content.lstrip("\n").rstrip()
-        if system == default_system:
-            system = ""
-
-    if functions:
-        tools_text = []
-        tools_name_text = []
-        for func_info in functions:
-            name = func_info.get("name", "")
-            name_m = func_info.get("name_for_model", name)
-            name_h = func_info.get("name_for_human", name)
-            desc = func_info.get("description", "")
-            desc_m = func_info.get("description_for_model", desc)
-            tool = TOOL_DESC.format(
-                name_for_model=name_m,
-                name_for_human=name_h,
-                # Hint: You can add the following format requirements in description:
-                #   "Format the arguments as a JSON object."
-                #   "Enclose the code within triple backticks (`) at the beginning and end of the code."
-                description_for_model=desc_m,
-                parameters=json.dumps(func_info["parameters"], ensure_ascii=False),
-            )
-            tools_text.append(tool)
-            tools_name_text.append(name_m)
-        tools_text = "\n\n".join(tools_text)
-        tools_name_text = ", ".join(tools_name_text)
-        system += "\n\n" + REACT_INSTRUCTION.format(
-            tools_text=tools_text,
-            tools_name_text=tools_name_text,
-        )
-        system = system.lstrip("\n").rstrip()
-
-    dummy_thought = {
-        "en": "\nThought: I now know the final answer.\nFinal answer: ",
-        "zh": "\nThought: 我会作答了。\nFinal answer: ",
-    }
 
     _messages = messages
     messages = []
     for m_idx, m in enumerate(_messages):
-        role, content, func_call = m.role, m.content, m.function_call
+        role, content = m.role, m.content
         if content:
             content = content.lstrip("\n").rstrip()
-        if role == "function":
-            if (len(messages) == 0) or (messages[-1].role != "assistant"):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid request: Expecting role assistant before role function.",
-                )
-            messages[-1].content += f"\nObservation: {content}"
-            if m_idx == len(_messages) - 1:
-                messages[-1].content += "\nThought:"
-        elif role == "assistant":
+        if role == "assistant":
             if len(messages) == 0:
                 raise HTTPException(
                     status_code=400,
@@ -250,17 +164,6 @@ def parse_messages(messages, functions):
                 )
             last_msg = messages[-1].content
             last_msg_has_zh = len(re.findall(r"[\u4e00-\u9fff]+", last_msg)) > 0
-            if func_call is None:
-                if functions:
-                    content = dummy_thought["zh" if last_msg_has_zh else "en"] + content
-            else:
-                f_name, f_args = func_call["name"], func_call["arguments"]
-                if not content:
-                    if last_msg_has_zh:
-                        content = f"Thought: 我可以使用 {f_name} API。"
-                    else:
-                        content = f"Thought: I can use {f_name}."
-                content = f"\n{content}\nAction: {f_name}\nAction Input: {f_args}"
             if messages[-1].role == "user":
                 messages.append(
                     ChatMessage(role="assistant", content=content.lstrip("\n").rstrip())
@@ -289,22 +192,12 @@ def parse_messages(messages, functions):
         if messages[i].role == "user" and messages[i + 1].role == "assistant":
             usr_msg = messages[i].content.lstrip("\n").rstrip()
             bot_msg = messages[i + 1].content.lstrip("\n").rstrip()
-            if system and (i == len(messages) - 2):
-                usr_msg = f"{system}\n\nQuestion: {usr_msg}"
-                system = ""
-            for t in dummy_thought.values():
-                t = t.lstrip("\n")
-                if bot_msg.startswith(t) and ("\nAction: " in bot_msg):
-                    bot_msg = bot_msg[len(t) :]
             history.append([usr_msg, bot_msg])
         else:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid request: Expecting exactly one user (or function) role before every assistant role.",
             )
-    if system:
-        assert query is not _TEXT_COMPLETION_CMD
-        query = f"{system}\n\nQuestion: {query}"
     return query, history
 
 
@@ -343,43 +236,21 @@ def parse_response(response):
     return choice_data
 
 
-# completion mode, not chat mode
-def text_complete_last_message(history, gen_kwargs):
-    im_start = "<|im_start|>"
-    im_end = "<|im_end|>"
-    prompt = f"{im_start}system\nYou are a helpful assistant.{im_end}"
-    for i, (query, response) in enumerate(history):
-        query = query.lstrip("\n").rstrip()
-        response = response.lstrip("\n").rstrip()
-        prompt += f"\n{im_start}user\n{query}{im_end}"
-        prompt += f"\n{im_start}assistant\n{response}{im_end}"
-    prompt = prompt[: -len(im_end)]
-
-    input_ids = torch.tensor([tokenizer.encode(prompt)]).to(model.device)
-    output = model.generate(input_ids, **gen_kwargs).tolist()[0]
-    output = tokenizer.decode(output, errors="ignore")
-    assert output.startswith(prompt)
-    output = output[len(prompt) :]
-    output = trim_stop_words(output)
-    print(f"<completion>\n{prompt}\n<!-- *** -->\n{output}\n</completion>")
-    return output
-
-
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def create_chat_completion(request: ChatCompletionRequest):
     global model, tokenizer
 
-    gen_kwargs = {}
+    generation_config = copy.deepcopy(model.generation_config)
     if request.temperature is not None:
         if request.temperature < 0.01:
-            gen_kwargs['top_k'] = 1  # greedy decoding
+            generation_config['top_k'] = 1 # greedy decoding
         else:
             # Not recommended. Please tune top_p instead.
-            gen_kwargs['temperature'] = request.temperature
+            generation_config['temperature'] = request.temperature
     if request.top_p is not None:
-        gen_kwargs['top_p'] = request.top_p
+        generation_config['top_p'] = request.top_p
 
-    query, history = parse_messages(request.messages, request.functions)
+    query, history = parse_messages(request.messages)
 
     if request.stream:
         if request.functions:
@@ -387,16 +258,20 @@ async def create_chat_completion(request: ChatCompletionRequest):
                 status_code=400,
                 detail="Invalid request: Function calling is not yet implemented for stream mode.",
             )
-        generate = predict(query, history, request.model, gen_kwargs)
+        generate = predict(query, history, request.model, generation_config)
         return EventSourceResponse(generate, media_type="text/event-stream")
 
     if query is _TEXT_COMPLETION_CMD:
-        response = text_complete_last_message(history, gen_kwargs=gen_kwargs)
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid request: COMPLETION model not supported now.",
+        )
     else:
         response = model.chat(
             query,
             history,
-            tokenizer
+            tokenizer,
+            generation_config=generation_config
         )
         print(f"<chat>\n{history}\n{query}\n<!-- *** -->\n{response}\n</chat>")
     _gc()
@@ -416,7 +291,7 @@ async def create_chat_completion(request: ChatCompletionRequest):
 
 
 async def predict(
-    query: str, history: List[List[str]], model_id: str, stop_words: List[str], gen_kwargs: Dict,
+    query: str, history: List[List[str]], model_id: str, generation_config: GenerationConfig
 ):
     global model, tokenizer
     choice_data = ChatCompletionResponseStreamChoice(
@@ -428,14 +303,7 @@ async def predict(
     yield "{}".format(chunk.model_dump_json(exclude_unset=True))
 
     current_length = 0
-    stop_words_ids = [tokenizer.encode(s) for s in stop_words] if stop_words else None
-    if stop_words:
-        # TODO: It's a little bit tricky to trim stop words in the stream mode.
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid request: custom stop words are not yet supported for stream mode.",
-        )
-    response_generator = model.chat(query, history, tokenizer, stream=True)
+    response_generator = model.chat(query, history, tokenizer, stream=True, generation_config=generation_config)
     
     for new_response in response_generator:
         if len(new_response) == current_length:
