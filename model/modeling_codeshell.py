@@ -944,6 +944,7 @@ class CodeShellForCausalLM(CodeShellPreTrainedModel):
         prompt += ai_name.rstrip()
 
         max_new_tokens = max_new_tokens or self.generation_config.max_new_tokens
+        max_new_tokens = max_new_tokens or 128
         max_input_tokens = self.config.n_positions - max_new_tokens
 
         input_tokens = tokenizer.encode(prompt)
