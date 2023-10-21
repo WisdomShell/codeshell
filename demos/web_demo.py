@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This code is based on Alibaba's web Demo. It has been modified from
+# This code is based on Qwen's web Demo. It has been modified from
 # its original forms to accommodate CodeShell.
 
 # Copyright (c) Alibaba Cloud.
@@ -29,24 +29,18 @@ import gradio as gr
 import mdtex2html
 
 import torch
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    LogitsProcessorList,
-    RepetitionPenaltyLogitsProcessor,
-    TemperatureLogitsWarper,
-    TopPLogitsWarper,
-)
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.generation import GenerationConfig
 
-DEFAULT_CKPT_PATH = 'WisdomShell/CodeShell'
+
+DEFAULT_CKPT_PATH = 'WisdomShell/CodeShell-7B-Chat'
 
 
 def _get_args():
     parser = ArgumentParser()
     parser.add_argument("-c", "--checkpoint-path", type=str, default=DEFAULT_CKPT_PATH,
                         help="Checkpoint name or path, default to %(default)r")
-    parser.add_argument("--cpu-only", action="store_true", help="Run demo with CPU only")
+    parser.add_argument("--device", type=str, default="cuda:0", help="GPU device.")
 
     parser.add_argument("--share", action="store_true", default=False,
                         help="Create a publicly shareable link for the interface.")
@@ -66,14 +60,9 @@ def _load_model_tokenizer(args):
         args.checkpoint_path, trust_remote_code=True, resume_download=True,
     )
 
-    if args.cpu_only:
-        device_map = "cpu"
-    else:
-        device_map = "auto"
-
     model = AutoModelForCausalLM.from_pretrained(
         args.checkpoint_path,
-        device_map=device_map,
+        device_map=args.device,
         trust_remote_code=True,
         resume_download=True,
         torch_dtype=torch.bfloat16
@@ -146,42 +135,9 @@ def _launch_demo(args, model, tokenizer, config):
         _chatbot.append((_parse_text(_query), ""))
         full_response = ""
 
-        input_ids = tokenizer(_query, return_tensors="pt").input_ids.to(device)
-        original_size = len(input_ids[0])
-        logits_processor = LogitsProcessorList(
-            [
-                TemperatureLogitsWarper(temperature=0.2),
-                RepetitionPenaltyLogitsProcessor(penalty=1.0),
-                TopPLogitsWarper(top_p=1.0),
-            ]
-        )
-        while True:
-            # Get logits for the next token
-            logits = model(input_ids).logits[:, -1, :]
-            logits = logits_processor(input_ids, logits)
-
-            probs = torch.nn.functional.softmax(logits, dim=-1)
-            next_token_id = torch.multinomial(probs, num_samples=1)
-
-            next_token = tokenizer.decode(next_token_id[0], skip_special_tokens=True)
-            _chatbot[-1] = (_parse_text(_query), _parse_text(next_token))
-
-            yield _chatbot
-            full_response = _parse_text(response)
-
-            
-            full_response = _parse_text(response)
-
-            input_ids = torch.cat((input_ids, next_token_id), dim=1)
-
-            if len(input_ids[0]) >= original_size + max_new_tokens:
-                break
-
-
-
-
-
-        for response in model.chat_stream(tokenizer, _query, history=_task_history, generation_config=config):
+        for response in model.chat(_query, _task_history, tokenizer, generation_config=config, stream=True):
+            response = response.replace('|end|', '')
+            response = response.replace('|<end>|', '')
             _chatbot[-1] = (_parse_text(_query), _parse_text(response))
 
             yield _chatbot
@@ -209,7 +165,8 @@ def _launch_demo(args, model, tokenizer, config):
         return _chatbot
 
     with gr.Blocks() as demo:
-
+        gr.Markdown("""<center><font size=8>CodeShell-Chat Bot</center>""")
+        
         chatbot = gr.Chatbot(label='CodeShell-Chat', elem_classes="control-height")
         query = gr.Textbox(lines=2, label='Input')
         task_history = gr.State([])
