@@ -215,7 +215,7 @@ def main():
                 response = response.replace('|<end>|', '')
                 _clear_screen()
                 print(f"\nUser: {query}")
-                print(f"\nQwen-Chat: {response}")
+                print(f"\CodeShell-Chat: {response}")
         except KeyboardInterrupt:
             print('[WARNING] Generation interrupted')
             continue

@@ -19,7 +19,8 @@
     "<commit_before>",
     "<commit_msg>",
     "<commit_after>",
-    "<reponame>"
+    "<reponame>",
+    "<|end|>"
   ],
   "bos_token": "<|endoftext|>",
   "clean_up_tokenization_spaces": true,
@@ -27,6 +28,6 @@
   "model_max_length": 8192,
   "tokenizer_class": "GPT2Tokenizer",
   "unk_token": "<|endoftext|>",
-  "vocab_size": 70019,
+  "vocab_size": 70020,
   "pad_token": "<|endoftext|>"
 }
