@@ -215,7 +215,7 @@ CodeShell基于Starcoder词表进行了优化，去除了使用频率较低的�
 | Tokenizer | Size | Chinese  | English | Code | Total|
 |---|---|---|---|---|---|
 | Starcoder | 49152 | 1.22 | 3.47 | 3.30 | 2.66 |
-| CodeShell | 70144 | 1.50 | 3.47 | 3.30 | 2.95 |
+| CodeShell | 70020 | 1.50 | 3.47 | 3.30 | 2.95 |
 
 
 ## License
