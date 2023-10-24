@@ -215,3 +215,7 @@ The affiliated party must not be a software service provider or cloud service pr
 There is no possibility for the affiliated party to re-license the granted commercial license to another third party without proper authorization.
 If the above conditions are met, you need to apply by sending an email to codeshell.opensource@gmail.com. After approval, you will be granted a global, non-exclusive, non-transferable, non-sublicensable commercial copyright license.
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=WisdomShell/codeshell&type=Date)](https://star-history.com/#WisdomShell/codeshell&Date)
+
