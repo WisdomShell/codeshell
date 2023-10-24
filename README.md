@@ -227,3 +227,9 @@ CodeShell基于Starcoder词表进行了优化，去除了使用频率较低的�
 3. 关联方不存在将获得授予的商业许可，在未经许可的前提下将其再授权给其他第三方的可能性。
 
 在满足上述条件的前提下，您需要通过向codeshell.opensource@gmail.com发送电子邮件提交申请。经审核通过后，将授予您一个全球的、非排他的、不可转让的、不可再授权的商业版权许可。
+
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=WisdomShell/codeshell&type=Date)](https://star-history.com/#WisdomShell/codeshell&Date)
+
