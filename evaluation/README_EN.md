@@ -1,5 +1,5 @@
 # Evaluation
-This guide introduces the evaluation process of codeshell. The evaluation script is base on [bigcode-evaluation-harness](https://github.com/bigcode-project/bigcode-evaluation-harness).
+This guide introduces the evaluation process of codeshell. The evaluation script is based on [bigcode-evaluation-harness](https://github.com/bigcode-project/bigcode-evaluation-harness).
 
 ## Quick Start
 
