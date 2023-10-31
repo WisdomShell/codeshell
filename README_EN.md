@@ -8,7 +8,7 @@
 
 <div align="center">
 
-[![license](https://img.shields.io/github/license/modelscope/modelscope.svg)](https://github.com/WisdomShell/codeshell/blob/main/LICENSE)
+[![license](https://img.shields.io/github/license/modelscope/modelscope.svg)](https://github.com/WisdomShell/codeshell/blob/main/License.pdf)
 <h4 align="center">
     <p><a href="https://github.com/WisdomShell/codeshell/blob/main/README.md"><b>Chinese</b></a>|<a href="https://github.com/WisdomShell/codeshell/blob/main/README_EN.md">English</a></p>
 </h4>
