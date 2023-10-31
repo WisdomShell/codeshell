@@ -3,7 +3,7 @@
 <p>
 
 <p align="center">
-  🤗 <a href="https://huggingface.co/WisdomShell/CodeShell" target="_blank">Hugging Face</a> • 🌐 <a href="http://se.pku.edu.cn/kcl/" target="_blank">PKU-KCL</a> 
+  🤗 <a href="https://huggingface.co/WisdomShell/CodeShell" target="_blank">Hugging Face</a> • 🤖 <a href="https://modelscope.cn/organization/WisdomShell" target="_blank">ModelScope</a> • 🌐 <a href="http://se.pku.edu.cn/kcl/" target="_blank">PKU-KCL</a> 
 </p>
 
 <div align="center">
