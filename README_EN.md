@@ -208,12 +208,13 @@ CodeShell optimized the Starcoder vocabulary by removing infrequently used words
 
 
 ## License
-The community's use of the CodeShell model must adhere to the "CodeShell Model License Agreement" and the Apache 2.0 license. CodeShell is permitted for commercial use. However, if you plan to use the CodeShell model or its derivative products for commercial purposes, you must confirm that the entity meets the following conditions:
+The community's use of the CodeShell model must adhere to the ["CodeShell Model License Agreement" ](https://github.com/WisdomShell/codeshell/blob/main/License.pdf) and the [ Apache 2.0 license](https://www.apache.org/licenses/LICENSE-2.0). CodeShell is permitted for commercial use. However, if you plan to use the CodeShell model or its derivative products for commercial purposes, you must confirm that the entity meets the following conditions:
 
-The daily average active user count (DAU) of the affiliated party's service or product cannot exceed 1 million.
-The affiliated party must not be a software service provider or cloud service provider.
-There is no possibility for the affiliated party to re-license the granted commercial license to another third party without proper authorization.
-If the above conditions are met, you need to apply by sending an email to codeshell.opensource@gmail.com. After approval, you will be granted a global, non-exclusive, non-transferable, non-sublicensable commercial copyright license.
+- The daily average active user count (DAU) of the affiliated party's service or product cannot exceed 1 million.
+- The affiliated party must not be a software service provider or cloud service provider.
+- There is no possibility for the affiliated party to re-license the granted commercial license to another third party without proper authorization.
+
+Under the aforementioned conditions, you need to submit the application materials required by the "CodeShell Model License Agreement" by sending an email to codeshell.opensource@gmail.com. After approval, you will be granted a global, non-exclusive, non-transferable, non-sublicensable commercial copyright license.
 
 ## Star History
 
