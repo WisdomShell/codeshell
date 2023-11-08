@@ -4,7 +4,7 @@
 <p>
 
 <p align="center">
-  🤗 <a href="https://huggingface.co/WisdomShell" target="_blank">Hugging Face</a> • 🤖 <a href="https://modelscope.cn/organization/WisdomShell" target="_blank">ModelScope</a> • 🌐 <a href="http://se.pku.edu.cn/kcl/" target="_blank">PKU-KCL</a> 
+  🤗 <a href="https://huggingface.co/WisdomShell" target="_blank">Hugging Face</a> • 🤖 <a href="https://modelscope.cn/organization/WisdomShell" target="_blank">ModelScope</a> ⭕️ <a href="https://www.wisemodel.cn/models/WisdomShell/CodeShell-7B" target="_blank">WiseModel</a> • 🌐 <a href="http://se.pku.edu.cn/kcl/" target="_blank">PKU-KCL</a> 
 </p>
 
 <div align="center">
