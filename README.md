@@ -163,7 +163,7 @@ python demos/cli_demo.py
 CodeShell也提供了基于OpenAI API的部署方法。
 
 ```
-python demos/openai_api.py
+python demos/openai_api.py -c WisdomShell/CodeShell-7B-Chat-int4
 ```
 
 启动后即可通过HTTP请求与CodeShell交互。
