@@ -248,7 +248,7 @@ def quantize_offline(model):
                         )
     return model
 
-def load_state_dict_for_qunantied_model(model, state_dict):
+def load_state_dict_for_quantized_model(model, state_dict):
     #replace Params4bit.cuda with Params4bitCuda
     Params4bit.cuda = Params4bitCuda
     Params4bit.to = Params4bitTo
