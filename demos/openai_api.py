@@ -243,12 +243,12 @@ async def create_chat_completion(request: ChatCompletionRequest):
     generation_config = copy.deepcopy(model.generation_config)
     if request.temperature is not None:
         if request.temperature < 0.01:
-            generation_config['top_k'] = 1 # greedy decoding
+            generation_config.top_k = 1 # greedy decoding
         else:
             # Not recommended. Please tune top_p instead.
-            generation_config['temperature'] = request.temperature
+            generation_config.temperature = request.temperature
     if request.top_p is not None:
-        generation_config['top_p'] = request.top_p
+        generation_config.top_p = request.top_p
 
     query, history = parse_messages(request.messages)
 
