@@ -91,7 +91,7 @@ outputs = model.generate(**inputs)
 print(tokenizer.decode(outputs[0]))
 ```
 
-- Fill in the Moddle
+- Fill in the Middle
 
 CodeShell 支持Fill-in-the-Middle模式，从而更好的支持软件开发过程。
 
