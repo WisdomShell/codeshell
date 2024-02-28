@@ -38,7 +38,7 @@ CodeShell是[北京大学知识计算实验室](http://se.pku.edu.cn/kcl/)联合
 
 ## Performance
 
-我们选取了目前最流行的两个代码评测数据集（HumanEval与MBPP）对模型进行评估，与目前最先进的两个7b代码大模型CodeLllama与Starcoder相比，Codeshell 取得了最优的成绩。具体评测结果如下。
+我们选取了目前最流行的两个代码评测数据集（HumanEval与MBPP）对模型进行评估，与目前最先进的两个7b代码大模型CodeLlama与Starcoder相比，Codeshell 取得了最优的成绩。具体评测结果如下。
 
 |   任务   |  CodeShell-7b | CodeLlama-7b | Starcoder-7b |
 | ------- | --------- | --------- | --------- |
