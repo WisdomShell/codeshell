@@ -22,10 +22,10 @@ import transformers
 from accelerate import Accelerator
 from transformers import AutoModelForCausalLM, AutoTokenizer, HfArgumentParser
 
-from lm_eval.arguments import EvalArguments
-from lm_eval.evaluator import Evaluator
+from bigcode_eval.arguments import EvalArguments
+from bigcode_eval.evaluator import Evaluator
 
-from lm_eval.tasks import (humaneval, mbpp, multiple)
+from bigcode_eval.tasks import (humaneval, mbpp, multiple)
 from .chat_humaneval import ChatHumanEval
 
 TASK_REGISTRY = {
