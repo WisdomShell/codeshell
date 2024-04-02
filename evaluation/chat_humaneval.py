@@ -25,7 +25,7 @@ Homepage: https://github.com/openai/human-eval
 
 from evaluate import load
 
-from lm_eval.base import Task
+from bigcode_eval.base import Task
 
 _CITATION = """
 @misc{chen2021evaluating,
