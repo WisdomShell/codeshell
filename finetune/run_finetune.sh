@@ -16,7 +16,7 @@ mkdir -p ${output_dir} ${log_dir}
 # deepspeed_args="--master_port=$((10000 + RANDOM % 20000)) --include=localhost:0,1,2,3"      # Default argument
 deepspeed_args="--master_port=$((10000 + RANDOM % 20000))"      # Default argument
 
-deepspeed ${deepspeed_args} ${project_dir}/kcl_finetune.py \
+deepspeed ${deepspeed_args} ${project_dir}/finetune.py \
     --deepspeed ${project_dir}/ds_config_zero3.json \
     --model_name_or_path ${model} \
     --data_path ${data_path} \
